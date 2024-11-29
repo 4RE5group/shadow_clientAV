@@ -136,6 +136,10 @@ void shutdown_daemon() {
 }
 
 int main(int argc, char* argv[]) {
+    cout << search_hex_hash("./database/4re5.lst", "d988060862d01ba2e6a5a618ebb644d1");
+
+
+
     if (argc < 2) {
         cerr << "Usage: " << argv[0] << " [-a filename | -e filename | --startup | --shutdown]" << endl;
         return 1;
