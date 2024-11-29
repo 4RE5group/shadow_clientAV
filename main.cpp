@@ -11,6 +11,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <filesystem>
+#include "opencv2/core.hpp"
+#include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
 
 using namespace std;
 
@@ -89,7 +92,7 @@ void start_daemon() {
     }
 }
 
-bool analyseFile(string file_path) {
+string analyseFile(string file_path) {
     if(std::filesystem::exists(file_path)) {
         // string file_path = "malwaredb/mal1";
         string file_hash = calculate_md5(file_path);
@@ -100,19 +103,18 @@ bool analyseFile(string file_path) {
         for(const auto file: filesystem::directory_iterator("./database")){
             cout << "Searching in " << file.path() << "...";
             db_path = file.path(); //"virus.lst";  // Database file
-            output = search_hex_hash(db_path, file_hash);
+            output = getSetting(file_hash.data(), db_path.data());
 
-            if(output != "") {
-                return true;
+            if(output != "not found") {
+                return output;
             }
             cout << COLOR_RED << " NOT FOUND" << COLOR_RESET << endl;
         }
-        return false;
         
     } else {
         cout << COLOR_RED << "File does not exist" << COLOR_RESET << endl;
-        return false;
     }
+    return "";
 }
 
 void shutdown_daemon() {
@@ -136,8 +138,6 @@ void shutdown_daemon() {
 }
 
 int main(int argc, char* argv[]) {
-    cout << search_hex_hash("./database/4re5.lst", "d988060862d01ba2e6a5a618ebb644d1");
-
 
 
     if (argc < 2) {
@@ -150,8 +150,9 @@ int main(int argc, char* argv[]) {
     if (option == "-a" && argc == 3) {
         string filename = argv[2];
         cout << "Analysing file: " << filename << endl;
-        if(analyseFile(filename)) {
-            cout << COLOR_RED << "=> " << filename << " is a virus /!\\" << COLOR_RESET << endl;
+        string output = analyseFile(filename);
+        if(output != "") {
+            cout << COLOR_RED << "=> " << filename << " is a virus => " << output << COLOR_RESET << endl;
         } else {
             cout << COLOR_GREEN << "=> " << filename << " is safe" << COLOR_RESET << endl;
         }
