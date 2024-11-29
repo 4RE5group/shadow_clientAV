@@ -11,9 +11,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <filesystem>
-#include "opencv2/core.hpp"
-#include "opencv2/highgui.hpp"
-#include "opencv2/imgproc.hpp"
 
 using namespace std;
 
@@ -21,7 +18,10 @@ using namespace std;
 #define COLOR_GREEN "\e[32m"
 #define COLOR_RESET "\e[0m"
 
-string calculate_md5(const string& file_path) {
+#define ROOT (string)"."
+
+string calculate_md5(const string& file_path) 
+{
     unsigned char hash[MD5_DIGEST_LENGTH];
     MD5_CTX md5_context;
     char buffer[4096];
@@ -48,6 +48,8 @@ string calculate_md5(const string& file_path) {
     for (int i = 0; i < MD5_DIGEST_LENGTH; ++i) {
         hash_string << hex << setw(2) << setfill('0') << static_cast<int>(hash[i]);
     }
+
+    file.close();
 
     return hash_string.str();
 }
@@ -92,27 +94,124 @@ void start_daemon() {
     }
 }
 
+void addException(string md5) {
+    ofstream exceptionList(ROOT+"/exceptions.lst");
+    if (!exceptionList.is_open()) {
+        cerr << "Error: Could not open exception file" << endl;
+        return;
+    }
+    exceptionList << md5;
+    
+    exceptionList.close();
+}
+
+bool isAnException(string md5, int* foundLine=nullptr) {
+    if(filesystem::exists(ROOT+"/exceptions.lst")) {
+        ifstream exceptionList(ROOT+"/exceptions.lst");
+        if (!exceptionList.is_open()) {
+            cerr << "Error: Could not open exception file" << endl;
+            return false;
+        }
+        string line;
+        foundLine=0;
+        while(true) {
+            if (getline(exceptionList, line)) {
+                if(line == md5) {
+                    return true;
+                }
+            } else {
+                break; // End of file reached
+            }
+            foundLine++;
+        }
+        exceptionList.close();
+        return false;
+    } else {
+        // create
+        ofstream exceptionList(ROOT+"/exceptions.lst");
+        if (!exceptionList.is_open()) {
+            cerr << "Error: Could not open exception file" << endl;
+            return false;
+        }
+        exceptionList << "";
+        
+        exceptionList.close();
+        
+        return false;
+    }
+}
+
+void removeException(string md5) {
+    int line_to_remove;
+    if(isAnException(md5, &line_to_remove)) {
+        // that can be removed
+        ifstream infile(ROOT+"/exceptions.lst");
+        if (!infile.is_open()) {
+            cerr << "Error: Unable to open file for reading." << endl;
+            return;
+        }
+
+        ofstream temp_file(ROOT+"/.tmpOP");
+        if (!temp_file.is_open()) {
+            cerr << "Error: Unable to open temporary file for writing." << endl;
+            return;
+        }
+
+        string line;
+        int current_line = 1;
+
+        while (getline(infile, line)) {
+            if (current_line != line_to_remove) {
+                temp_file << line << endl;
+            }
+            current_line++;
+        }
+
+        infile.close();
+        temp_file.close();
+
+        // Replace the original file with the temporary file
+        if (remove((ROOT+"/exceptions.lst").c_str()) != 0) {
+            cerr << "Error: Unable to remove the original file." << endl;
+            return;
+        }
+        if (rename((ROOT+"/.tmpOP").c_str(), (ROOT+"/exceptions.lst").c_str()) != 0) {
+            cerr << "Error: Unable to rename the temporary file." << endl;
+            return;
+        }
+    }
+
+    cout << COLOR_GREEN << "[o] Successfully removed exception" << COLOR_RESET << endl;
+}
+
 string analyseFile(string file_path) {
-    if(std::filesystem::exists(file_path)) {
+    if(filesystem::exists(file_path)) {
         // string file_path = "malwaredb/mal1";
         string file_hash = calculate_md5(file_path);
         cout << "MD5 Hash: '" << file_hash << "'" << endl;
 
         string db_path = "";
         string output = "";
-        for(const auto file: filesystem::directory_iterator("./database")){
+        for(const auto file: filesystem::directory_iterator(ROOT+"/database")){
             cout << "Searching in " << file.path() << "...";
-            db_path = file.path(); //"virus.lst";  // Database file
+            db_path = file.path();
             output = getSetting(file_hash.data(), db_path.data());
 
             if(output != "not found") {
-                return output;
+                if(!isAnException(file_hash)) { // if not an exception
+                    cout << COLOR_GREEN << " FOUND" << COLOR_RESET;
+                    return output;
+                } else {
+                    cout << COLOR_GREEN << " EXCLUDED" << COLOR_RESET;
+                }
+                
             }
             cout << COLOR_RED << " NOT FOUND" << COLOR_RESET << endl;
         }
         
     } else {
         cout << COLOR_RED << "File does not exist" << COLOR_RESET << endl;
+        exit(1);
     }
     return "";
 }
@@ -138,27 +237,59 @@ void shutdown_daemon() {
 }
 
 int main(int argc, char* argv[]) {
-
-
     if (argc < 2) {
-        cerr << "Usage: " << argv[0] << " [-a filename | -e filename | --startup | --shutdown]" << endl;
+        cerr << COLOR_RED << "Invalid arguments. Use argument -h or --help to get help" << COLOR_RESET << endl;
         return 1;
     }
 
     string option = argv[1];
-
-    if (option == "-a" && argc == 3) {
+    if(option == "-h" || option == "--help"){
+        cout << "SHADOW CLIENT - 4re5 group 2024" << endl;
+        cout << "commands: " << endl;
+        cout << "   -h or --help       : get help" << endl;
+        cout << "   -a <filename>      : analyse file" << endl;
+        cout << "   -e <filename>      : exclude file from antivirus" << endl;
+        cout << "   -r <filename>      : remove file from exclusionList" << endl;
+        cout << "   --shutdown         : stop background AV daemon" << endl;
+        cout << "   --startup          : start background AV daemon" << endl;
+        cout << "   -s                 : print antivirus md5 hash databases" << endl;
+        cout << "   -el                : print saved exclusions" << endl;
+        
+    } 
+    else if(option == "-s") {
+        cout << "shadow client database list:" << endl;
+        for(const auto file: filesystem::directory_iterator(ROOT+"/database")) {
+            cout << "   => " << file.path() << endl;
+        }
+    } else if(option == "-el") {
+        cout << "shadow client exclusion list:" << endl;
+        ifstream infile(ROOT+"/exceptions.lst");
+        if (!infile.is_open()) {
+            cerr << "Error: Unable to open exception file for reading." << endl;
+        }
+        string line;
+        while(getline(infile, line)) {
+            cout << "   => " << line << endl;
+        }
+        infile.close();
+    }
+    else if (option == "-a" && argc == 3) {
         string filename = argv[2];
         cout << "Analysing file: " << filename << endl;
         string output = analyseFile(filename);
         if(output != "") {
-            cout << COLOR_RED << "=> " << filename << " is a virus => " << output << COLOR_RESET << endl;
+            cout << endl << COLOR_RED << "=> " << filename << " is a virus type: '" << output << "'" << COLOR_RESET << endl;
         } else {
-            cout << COLOR_GREEN << "=> " << filename << " is safe" << COLOR_RESET << endl;
+            cout << endl << COLOR_GREEN << "=> '" << filename << "' is safe" << COLOR_RESET << endl;
         }
     } else if (option == "-e" && argc == 3) {
         string filename = argv[2];
-        cout << "e: " << filename << endl;
+        addException(calculate_md5(filename));
+        cout << COLOR_GREEN << "[+] added exception " << filename << " successfully" << COLOR_RESET << endl;
+    } else if (option == "-r" && argc == 3) {
+        string filename = argv[2];
+        removeException(calculate_md5(filename));
+        cout << COLOR_GREEN << "[-] removed exception " << filename << " successfully" << COLOR_RESET << endl;
     } else if (option == "--startup") {
         cout << "Starting as a background daemon..." << endl;
         start_daemon();
@@ -166,7 +297,7 @@ int main(int argc, char* argv[]) {
         cout << "Shutting down the background daemon..." << endl;
         shutdown_daemon();
     } else {
-        cerr << COLOR_RED << "Invalid arguments. Usage: " << argv[0] << " [-a filename | -e filename | --startup | --shutdown]" << COLOR_RESET << endl;
+        cerr << COLOR_RED << "Invalid arguments. Use argument -h or --help to get help" << COLOR_RESET << endl;
         return 1;
     }
 
