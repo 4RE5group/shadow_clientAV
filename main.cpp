@@ -4,7 +4,7 @@
 #include <iomanip>
 #include <vector>
 #include <openssl/md5.h>
-#include <settings.h>
+#include "settings.h"
 #include <string>
 #include <unistd.h>
 #include <signal.h>
