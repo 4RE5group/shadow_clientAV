@@ -1,0 +1,25 @@
+name: 4re5-repo
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: bash ./build.sh
+    - name: install 4re5 manager
+      run: wget https://github.com/4RE5group/4re5-manager/releases/latest/download/release.deb && sudo dpkg -i release.deb
+    - name: update repo
+      run: sudo 4re5-manager update
+    - name: version verification
+      run: sudo 4re5-manager -v
+    - name: check compatibility
+      run: sudo 4re5-manager install com.ares.shadowclient
