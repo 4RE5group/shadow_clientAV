@@ -1,9 +1,6 @@
 #include "settings.h"
 
-
 using namespace std;
-
-
 
 string remove_space(string input) {
     input.erase(remove(input.begin(), input.end(), '	'), input.end());
@@ -98,4 +95,63 @@ void writeSetting(char* name, char* value, char* path)
 
 	fprintf(fptr,"name2: custom_value");
 	fclose(fptr);
+}
+
+string get_hash_from_line(const string& line) {
+    auto pos = line.find(":");
+    if (pos != string::npos) {
+        return line.substr(0, pos);  // Return only the hash part
+    }
+    return "";  // Return empty string if format is invalid
+}
+
+string search_hex_hash(const string& file_path, const string& target_hash) {
+    ifstream file(file_path);
+    if (!file.is_open()) {
+        throw runtime_error("Failed to open file: " + file_path);
+    }
+
+    file.seekg(0, ios::end);
+    streampos file_size = file.tellg();
+    streampos start = 0;
+    streampos end = file_size;
+
+    string line;
+    while (start <= end) {
+        streampos mid = (start + end) / 2;
+        file.seekg(mid);
+
+        // Move to the beginning of the current line
+        if (mid > 0) {
+            file.ignore(numeric_limits<streamsize>::max(), '\n');
+        }
+
+        if (!getline(file, line)) {
+            break;  // End of file reached
+        }
+
+        string hash = get_hash_from_line(line);
+
+        if (hash == target_hash) {
+            return line.substr(hash.length() + 2);  // Return the text part after ": "
+        } else if (hash < target_hash) {
+            start = file.tellg();  // Move to the right
+        } else {
+            end = mid - 1;  // Move to the left
+        }
+
+        // Handle special case where the file has only one line
+        if (start == 0 && end == 0) {
+            file.seekg(0);
+            if (getline(file, line)) {
+                hash = get_hash_from_line(line);
+                if (hash == target_hash) {
+                    return line.substr(hash.length() + 2);
+                }
+            }
+            break;
+        }
+    }
+
+    return "";  // Hash not found
 }
