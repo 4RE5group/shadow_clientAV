@@ -16,6 +16,11 @@ jobs:
     - name: build
       run: make
     - name: install 4re5 manager
-      run: wget https://github.com/4RE5group/4re5-manager/releases/latest/download/release.deb && sudo dpkg -i release.deb && 4re5-manager -v
+      run: |
+        wget https://github.com/4RE5group/4re5-manager/releases/latest/download/release.deb
+        sudo dpkg -i release.deb
+        sudo 4re5-manager -v
     - name: update repo
-      run: 4re5-manager update && 4re5-manager install shadowclient
+      run: |
+        sudo 4re5-manager update
+        sudo 4re5-manager install shadowclient
