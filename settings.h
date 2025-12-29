@@ -2,6 +2,7 @@
 #define SETTINGSFILEHANDLER_H_
 
 #include <limits>
+#include <string>
 
 char* getSetting(char* name,  char* path);
 void writeSetting(char* name, char* value, char* path);
