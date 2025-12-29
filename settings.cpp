@@ -1,17 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "settings.h"
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <algorithm>
-#include <stdexcept>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <limits>
-#include <cstring>
+
 
 using namespace std;
 
