@@ -3,6 +3,9 @@
 
 #include <limits>
 #include <string>
+#include <fstream>
+#include <stdexcept>
+#include <ios>
 
 char* getSetting(char* name,  char* path);
 void writeSetting(char* name, char* value, char* path);
